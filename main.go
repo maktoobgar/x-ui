@@ -17,11 +17,18 @@ import (
 	"x-ui/web/service"
 
 	"github.com/op/go-logging"
+	"golang.org/x/text/language"
 )
 
-func runWebServer() {
+// Runs the whole web server
+func runWebServer(port ...int) {
 	log.Printf("%v %v", config.GetName(), config.GetVersion())
+	var p int = 0
+	if len(port) > 0 {
+		p = port[0]
+	}
 
+	// Set Logger
 	switch config.GetLogLevel() {
 	case config.Debug:
 		logger.InitLogger(logging.DEBUG)
@@ -35,24 +42,30 @@ func runWebServer() {
 		log.Fatal("unknown log level:", config.GetLogLevel())
 	}
 
+	// Init Database
 	err := database.InitDB(config.GetDBPath())
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// Set Server
 	var server *web.Server
-
 	server = web.NewServer()
 	global.SetWebServer(server)
-	err = server.Start()
+	err = server.Start(p)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	// Handles Restart Or System Shutdown Based On OS Signals
 	sigCh := make(chan os.Signal, 1)
-	//信号量捕获处理
-	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGKILL)
+	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGHUP)
 	for {
 		sig := <-sigCh
 
@@ -64,7 +77,7 @@ func runWebServer() {
 			}
 			server = web.NewServer()
 			global.SetWebServer(server)
-			err = server.Start()
+			err = server.Start(p)
 			if err != nil {
 				log.Println(err)
 				return
@@ -76,6 +89,7 @@ func runWebServer() {
 	}
 }
 
+// Deletes All Records In `Setting` model
 func resetSetting() {
 	err := database.InitDB(config.GetDBPath())
 	if err != nil {
@@ -92,6 +106,7 @@ func resetSetting() {
 	}
 }
 
+// Prints `username`, `password` And `port` Number
 func showSetting(show bool) {
 	if show {
 		settingService := service.SettingService{}
@@ -116,66 +131,7 @@ func showSetting(show bool) {
 	}
 }
 
-func updateTgbotEnableSts(status bool) {
-	settingService := service.SettingService{}
-	currentTgSts, err := settingService.GetTgbotenabled()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	logger.Infof("current enabletgbot status[%v],need update to status[%v]", currentTgSts, status)
-	if currentTgSts != status {
-		err := settingService.SetTgbotenabled(status)
-		if err != nil {
-			fmt.Println(err)
-			return
-		} else {
-			logger.Infof("SetTgbotenabled[%v] success", status)
-		}
-	}
-	return
-}
-
-func updateTgbotSetting(tgBotToken string, tgBotChatid int, tgBotRuntime string) {
-	err := database.InitDB(config.GetDBPath())
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	settingService := service.SettingService{}
-
-	if tgBotToken != "" {
-		err := settingService.SetTgBotToken(tgBotToken)
-		if err != nil {
-			fmt.Println(err)
-			return
-		} else {
-			logger.Info("updateTgbotSetting tgBotToken success")
-		}
-	}
-
-	if tgBotRuntime != "" {
-		err := settingService.SetTgbotRuntime(tgBotRuntime)
-		if err != nil {
-			fmt.Println(err)
-			return
-		} else {
-			logger.Infof("updateTgbotSetting tgBotRuntime[%s] success", tgBotRuntime)
-		}
-	}
-
-	if tgBotChatid != 0 {
-		err := settingService.SetTgBotChatId(tgBotChatid)
-		if err != nil {
-			fmt.Println(err)
-			return
-		} else {
-			logger.Info("updateTgbotSetting tgBotChatid success")
-		}
-	}
-}
-
+// Updates `username`, `password` And `port` Number
 func updateSetting(port int, username string, password string) {
 	err := database.InitDB(config.GetDBPath())
 	if err != nil {
@@ -214,13 +170,14 @@ func main() {
 	flag.BoolVar(&showVersion, "v", false, "show version")
 
 	runCmd := flag.NewFlagSet("run", flag.ExitOnError)
+	var port int
+	runCmd.IntVar(&port, "port", 0, "hosts panel on passed port - default=54321")
 
 	v2uiCmd := flag.NewFlagSet("v2-ui", flag.ExitOnError)
 	var dbPath string
 	v2uiCmd.StringVar(&dbPath, "db", "/etc/v2-ui/v2-ui.db", "set v2-ui db file path")
 
 	settingCmd := flag.NewFlagSet("setting", flag.ExitOnError)
-	var port int
 	var username string
 	var password string
 	var tgbottoken string
@@ -262,7 +219,7 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-		runWebServer()
+		runWebServer(port)
 	case "v2-ui":
 		err := v2uiCmd.Parse(os.Args[2:])
 		if err != nil {
@@ -287,9 +244,10 @@ func main() {
 		if show {
 			showSetting(show)
 		}
-		if (tgbottoken != "") || (tgbotchatid != 0) || (tgbotRuntime != "") {
-			updateTgbotSetting(tgbottoken, tgbotchatid, tgbotRuntime)
-		}
+		//? Commented Cause Called Function Is Commented.
+		// if (tgbottoken != "") || (tgbotchatid != 0) || (tgbotRuntime != "") {
+		// 	updateTgbotSetting(tgbottoken, tgbotchatid, tgbotRuntime)
+		// }
 	default:
 		fmt.Println("except 'run' or 'v2-ui' or 'setting' subcommands")
 		fmt.Println()
@@ -300,3 +258,65 @@ func main() {
 		settingCmd.Usage()
 	}
 }
+
+//? Updates Telegram Bot Enable Status?!!
+// func updateTgbotEnableSts(status bool) {
+// 	settingService := service.SettingService{}
+// 	currentTgSts, err := settingService.GetTgbotenabled()
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return
+// 	}
+// 	logger.Infof("current enabletgbot status[%v],need update to status[%v]", currentTgSts, status)
+// 	if currentTgSts != status {
+// 		err := settingService.SetTgbotenabled(status)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return
+// 		} else {
+// 			logger.Infof("SetTgbotenabled[%v] success", status)
+// 		}
+// 	}
+// 	return
+// }
+
+//? Updates Telegram Bot Settings?!!
+// func updateTgbotSetting(tgBotToken string, tgBotChatid int, tgBotRuntime string) {
+// 	err := database.InitDB(config.GetDBPath())
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return
+// 	}
+
+// 	settingService := service.SettingService{}
+
+// 	if tgBotToken != "" {
+// 		err := settingService.SetTgBotToken(tgBotToken)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return
+// 		} else {
+// 			logger.Info("updateTgbotSetting tgBotToken success")
+// 		}
+// 	}
+
+// 	if tgBotRuntime != "" {
+// 		err := settingService.SetTgbotRuntime(tgBotRuntime)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return
+// 		} else {
+// 			logger.Infof("updateTgbotSetting tgBotRuntime[%s] success", tgBotRuntime)
+// 		}
+// 	}
+
+// 	if tgBotChatid != 0 {
+// 		err := settingService.SetTgBotChatId(tgBotChatid)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return
+// 		} else {
+// 			logger.Info("updateTgbotSetting tgBotChatid success")
+// 		}
+// 	}
+// }

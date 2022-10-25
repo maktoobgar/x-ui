@@ -315,7 +315,7 @@ func (s *Server) startTask() {
 	}
 }
 
-func (s *Server) Start() (err error) {
+func (s *Server) Start(port int) (err error) {
 	//这是一个匿名函数，没没有函数名
 	defer func() {
 		if err != nil {
@@ -347,9 +347,11 @@ func (s *Server) Start() (err error) {
 	if err != nil {
 		return err
 	}
-	port, err := s.settingService.GetPort()
-	if err != nil {
-		return err
+	if port == 0 {
+		port, err = s.settingService.GetPort()
+		if err != nil {
+			return err
+		}
 	}
 	listenAddr := net.JoinHostPort(listen, strconv.Itoa(port))
 	listener, err := net.Listen("tcp", listenAddr)
