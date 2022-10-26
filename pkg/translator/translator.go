@@ -1,7 +1,10 @@
 package translator
 
 import (
+	"embed"
 	"fmt"
+	"io/fs"
+	"path/filepath"
 
 	"github.com/BurntSushi/toml"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -11,7 +14,7 @@ import (
 const (
 	// Format of how file names are specified in translation
 	// folder storage. it's like: message.en.json or message.fa.toml
-	fileFormat string = "translation.%s.%s"
+	fileFormat string = "translation.%v.%v"
 )
 
 type (
@@ -27,8 +30,8 @@ type TranslatorPack struct {
 }
 
 var (
-	// The address where all translation files are stored.
-	path string = ""
+	filesFS   embed.FS
+	filesRoot string
 	// The main translator object that will be used in the whole services
 	translator *TranslatorPack = &TranslatorPack{
 		addedLanguages: []string{},
@@ -46,20 +49,9 @@ var (
 //
 // You can get your language Tag with using "golang.org/x/text/language"
 // library like: language.English
-//
-// If `address` == "", on linux we will set address to "build/translations" and
-// on windows address is "build\translations\"
-func New(address string, defaultLanguage language.Tag, languages ...language.Tag) (Translator, error) {
-	path = address
-
-	if path == "" {
-		path = "build/translations/"
-	}
-
-	if path[len(path)-1] != '/' || path[len(path)-1] != '\\' {
-		path += "/"
-	}
-
+func New(translations embed.FS, rootAddress string, defaultLanguage language.Tag, languages ...language.Tag) (Translator, error) {
+	filesFS = translations
+	filesRoot = rootAddress
 	translator.bundle = i18n.NewBundle(defaultLanguage)
 	translator.bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
 
@@ -95,6 +87,34 @@ func (translator *TranslatorPack) GetTranslator(language string) func(string) st
 	}
 }
 
+// Loads embed translations contents into translator
+func loadFS(root string) error {
+	err := fs.WalkDir(filesFS, root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			content, err := filesFS.ReadFile(filepath.Join(filesRoot, d.Name()))
+			if err != nil {
+				return fmt.Errorf("couldn't read %s file, file format should be like: %s", filepath.Join(root, d.Name()), fmt.Sprintf(fileFormat, translator.addedLanguages, supportedFormats))
+			}
+			_, err = translator.bundle.ParseMessageFileBytes(content, d.Name())
+			if err != nil {
+				return fmt.Errorf("couldn't parse content of %s file, file format should be like: %s", filepath.Join(root, d.Name()), fmt.Sprintf(fileFormat, translator.addedLanguages, supportedFormats))
+			}
+		} else {
+			if path != root {
+				return loadFS(path)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return err
+}
+
 // Loads translation files and if no file for language determined
 // in specified address in `address` variable, return error
 //
@@ -102,42 +122,20 @@ func (translator *TranslatorPack) GetTranslator(language string) func(string) st
 //
 // After that it calls loadLocalizers to create localizers for translation
 // to different languages
-//
-// You can get your language Tag with using "golang.org/x/text/language"
-// library like: language.English
 func loadLanguages(languages ...language.Tag) error {
 	if translator.bundle == nil {
 		return fmt.Errorf("please call Setup function first")
 	}
 
-	var exit bool
 	for _, lang := range languages {
-		exit = false
-		for _, langString := range translator.addedLanguages {
-			if lang.String() == langString {
-				exit = true
-			}
-		}
-		if !exit {
-			translator.addedLanguages = append(translator.addedLanguages, lang.String())
-			var err error = nil
-			var atLeastOneExists bool = false
-			for _, format := range supportedFormats {
-				_, e := translator.bundle.LoadMessageFile(fmt.Sprintf(path+fileFormat, lang.String(), format))
-				if atLeastOneExists {
-					err = nil
-				} else if e == nil {
-					atLeastOneExists = true
-				} else {
-					err = e
-				}
-
-			}
-			if err != nil {
-				return fmt.Errorf("'%s' language has no file to read, create one like "+fileFormat+" in %s\n\t\t     supported formats: %s", lang.String(), lang.String(), "json", path, supportedFormats)
-			}
-		}
+		translator.addedLanguages = append(translator.addedLanguages, lang.String())
 	}
+
+	err := loadFS(filesRoot)
+	if err != nil {
+		return err
+	}
+
 	loadLocalizers()
 
 	return nil

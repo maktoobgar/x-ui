@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"embed"
-	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
@@ -35,6 +34,9 @@ var assetsFS embed.FS
 
 //go:embed html/*
 var htmlFS embed.FS
+
+//go:embed translations/*
+var translationsFS embed.FS
 
 var startTime = time.Now()
 
@@ -142,6 +144,7 @@ func (s *Server) getHtmlTemplate(funcMap template.FuncMap) (*template.Template, 
 	return t, nil
 }
 
+// ! HEREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
 func (s *Server) initRouter() (*gin.Engine, error) {
 	if config.IsDebug() {
 		gin.SetMode(gin.DebugMode)
@@ -209,9 +212,8 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 
 // Sets translator in gin router
 func (s *Server) initI18n(engine *gin.Engine) error {
-	t, err := translator.New("translations", language.English, language.Persian)
+	t, err := translator.New(translationsFS, "translations", language.English, language.Persian)
 	if err != nil {
-		fmt.Println("here")
 		return err
 	}
 
