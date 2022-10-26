@@ -17,7 +17,6 @@ import (
 	"x-ui/web/service"
 
 	"github.com/op/go-logging"
-	"golang.org/x/text/language"
 )
 
 // Runs the whole web server
@@ -53,11 +52,6 @@ func runWebServer(port ...int) {
 	server = web.NewServer()
 	global.SetWebServer(server)
 	err = server.Start(p)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
 	if err != nil {
 		log.Println(err)
 		return

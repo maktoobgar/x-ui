@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"embed"
+	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
@@ -15,17 +16,16 @@ import (
 	"time"
 	"x-ui/config"
 	"x-ui/logger"
+	"x-ui/pkg/translator"
 	"x-ui/util/common"
 	"x-ui/web/controller"
 	"x-ui/web/job"
 	"x-ui/web/network"
 	"x-ui/web/service"
 
-	"github.com/BurntSushi/toml"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
-	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/robfig/cron/v3"
 	"golang.org/x/text/language"
 )
@@ -35,9 +35,6 @@ var assetsFS embed.FS
 
 //go:embed html/*
 var htmlFS embed.FS
-
-//go:embed translation/*
-var i18nFS embed.FS
 
 var startTime = time.Now()
 
@@ -210,131 +207,83 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	return engine, nil
 }
 
+// Sets translator in gin router
 func (s *Server) initI18n(engine *gin.Engine) error {
-	bundle := i18n.NewBundle(language.SimplifiedChinese)
-	bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
-	err := fs.WalkDir(i18nFS, "translation", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		data, err := i18nFS.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		_, err = bundle.ParseMessageFileBytes(data, path)
-		return err
-	})
+	t, err := translator.New("translations", language.English, language.Persian)
 	if err != nil {
+		fmt.Println("here")
 		return err
-	}
-
-	findI18nParamNames := func(key string) []string {
-		names := make([]string, 0)
-		keyLen := len(key)
-		for i := 0; i < keyLen-1; i++ {
-			if key[i:i+2] == "{{" { // 判断开头 "{{"
-				j := i + 2
-				isFind := false
-				for ; j < keyLen-1; j++ {
-					if key[j:j+2] == "}}" { // 结尾 "}}"
-						isFind = true
-						break
-					}
-				}
-				if isFind {
-					names = append(names, key[i+3:j])
-				}
-			}
-		}
-		return names
-	}
-
-	var localizer *i18n.Localizer
-
-	engine.FuncMap["i18n"] = func(key string, params ...string) (string, error) {
-		names := findI18nParamNames(key)
-		if len(names) != len(params) {
-			return "", common.NewError("find names:", names, "---------- params:", params, "---------- num not equal")
-		}
-		templateData := map[string]interface{}{}
-		for i := range names {
-			templateData[names[i]] = params[i]
-		}
-		return localizer.Localize(&i18n.LocalizeConfig{
-			MessageID:    key,
-			TemplateData: templateData,
-		})
 	}
 
 	engine.Use(func(c *gin.Context) {
-		accept := c.GetHeader("Accept-Language")
-		localizer = i18n.NewLocalizer(bundle, accept)
-		c.Set("localizer", localizer)
+		lang := c.GetHeader("Accept-Language")
+		c.Set("translator", t.GetTranslator(lang))
 		c.Next()
 	})
 
 	return nil
 }
 
+// Starts xray and it's related cron scheduled tasks
 func (s *Server) startTask() {
 	err := s.xrayService.RestartXray(true)
 	if err != nil {
 		logger.Warning("start xray failed:", err)
 	}
-	// 每 30 秒检查一次 xray 是否在运行
+	// Check every 30 seconds if xray is running
 	s.cron.AddJob("@every 30s", job.NewCheckXrayRunningJob())
 
 	go func() {
 		time.Sleep(time.Second * 5)
-		// 每 10 秒统计一次流量，首次启动延迟 5 秒，与重启 xray 的时间错开
+		// Traffic is counted every 10 seconds with
+		// 5 seconds delay to give xray a time to start
 		s.cron.AddJob("@every 10s", job.NewXrayTrafficJob())
 	}()
 
-	// 每 30 秒检查一次 inbound 流量超出和到期的情况
+	// Check for inbound traffic excess and expiration every 30 seconds
 	s.cron.AddJob("@every 30s", job.NewCheckInboundJob())
-	// 每一天提示一次流量情况,上海时间8点30
-	var entry cron.EntryID
-	isTgbotenabled, err := s.settingService.GetTgbotenabled()
-	if (err == nil) && (isTgbotenabled) {
-		runtime, err := s.settingService.GetTgbotRuntime()
-		if err != nil || runtime == "" {
-			logger.Errorf("Add NewStatsNotifyJob error[%s],Runtime[%s] invalid,wil run default", err, runtime)
-			runtime = "@daily"
-		}
-		logger.Infof("Tg notify enabled,run at %s", runtime)
-		entry, err = s.cron.AddJob(runtime, job.NewStatsNotifyJob())
-		if err != nil {
-			logger.Warning("Add NewStatsNotifyJob error", err)
-			return
-		}
-	} else {
-		s.cron.Remove(entry)
-	}
+	//? The traffic situation is prompted once a day, at 8:30 Shanghai time
+	// isTgbotenabled, err := s.settingService.GetTgbotenabled()
+	// if (err == nil) && (isTgbotenabled) {
+	// 	runtime, err := s.settingService.GetTgbotRuntime()
+	// 	if err != nil || runtime == "" {
+	// 		logger.Errorf("Add NewStatsNotifyJob error[%s],Runtime[%s] invalid,wil run default", err, runtime)
+	// 		runtime = "@daily"
+	// 	}
+	// 	logger.Infof("Tg notify enabled,run at %s", runtime)
+	// 	_, err = s.cron.AddJob(runtime, job.NewStatsNotifyJob())
+	// 	if err != nil {
+	// 		logger.Warning("Add NewStatsNotifyJob error", err)
+	// 		return
+	// 	}
+	// }
 }
 
+// Starts the x-ui dashboard server and xray service
 func (s *Server) Start(port int) (err error) {
-	//这是一个匿名函数，没没有函数名
+	// Close the server at the end if error happened
 	defer func() {
 		if err != nil {
 			s.Stop()
 		}
 	}()
 
+	// Gets location like: Asia/Tehran
 	loc, err := s.settingService.GetTimeLocation()
 	if err != nil {
 		return err
 	}
+	// Setup cron for scheduled jobs
 	s.cron = cron.New(cron.WithLocation(loc), cron.WithSeconds())
 	s.cron.Start()
 
+	// Initialize routers
 	engine, err := s.initRouter()
 	if err != nil {
 		return err
 	}
 
+	// Gets certifications if defined
 	certFile, err := s.settingService.GetCertFile()
 	if err != nil {
 		return err
@@ -343,16 +292,22 @@ func (s *Server) Start(port int) (err error) {
 	if err != nil {
 		return err
 	}
+
+	// Gets listening address if defined
 	listen, err := s.settingService.GetListen()
 	if err != nil {
 		return err
 	}
+
+	// Gets listening port - default 54321
 	if port == 0 {
 		port, err = s.settingService.GetPort()
 		if err != nil {
 			return err
 		}
 	}
+
+	// Defining listener with or without certificates
 	listenAddr := net.JoinHostPort(listen, strconv.Itoa(port))
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
@@ -370,7 +325,6 @@ func (s *Server) Start(port int) (err error) {
 		listener = network.NewAutoHttpsListener(listener)
 		listener = tls.NewListener(listener, c)
 	}
-
 	if certFile != "" || keyFile != "" {
 		logger.Info("web server run https on", listener.Addr())
 	} else {
@@ -378,12 +332,13 @@ func (s *Server) Start(port int) (err error) {
 	}
 	s.listener = listener
 
+	// Starts xray and it's related cron scheduled tasks
 	s.startTask()
 
+	// Serve x-ui Dashboard
 	s.httpServer = &http.Server{
 		Handler: engine,
 	}
-
 	go func() {
 		s.httpServer.Serve(listener)
 	}()
@@ -391,6 +346,7 @@ func (s *Server) Start(port int) (err error) {
 	return nil
 }
 
+// Stops x-ui dashboard and xray service
 func (s *Server) Stop() error {
 	s.cancel()
 	s.xrayService.StopXray()
@@ -408,10 +364,12 @@ func (s *Server) Stop() error {
 	return common.Combine(err1, err2)
 }
 
+// Return context of the server
 func (s *Server) GetCtx() context.Context {
 	return s.ctx
 }
 
+// Return crontab of the server
 func (s *Server) GetCron() *cron.Cron {
 	return s.cron
 }
