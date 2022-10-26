@@ -10,6 +10,7 @@ require (
 	github.com/gin-gonic/gin v1.7.1
 	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
+	github.com/golodash/godash v1.2.0
 	github.com/nicksnyder/go-i18n/v2 v2.1.2
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/robfig/cron/v3 v3.0.1
@@ -21,6 +22,7 @@ require (
 	golang.org/x/text v0.3.6
 	google.golang.org/grpc v1.38.0
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v3 v3.0.0-20200605160147-a5ece683394c // indirect
 	gorm.io/driver/sqlite v1.1.4
 	gorm.io/gorm v1.21.9
 )

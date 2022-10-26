@@ -1,0 +1,9 @@
+debug: false
+name: "x-ui"
+version: "0.3.2"
+db_path: "x-ui.db"
+# debug
+# info
+# warn
+# error
+log_level: "error"
