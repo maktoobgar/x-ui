@@ -92,6 +92,8 @@ type Server struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	config *config.Config
 }
 
 func NewServer() *Server {
@@ -99,6 +101,7 @@ func NewServer() *Server {
 	return &Server{
 		ctx:    ctx,
 		cancel: cancel,
+		config: config.GetCFG(),
 	}
 }
 
@@ -144,7 +147,7 @@ func (s *Server) getHtmlTemplate(funcMap template.FuncMap) (*template.Template, 
 	return t, nil
 }
 
-// ! HEREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+// Initialize router
 func (s *Server) initRouter() (*gin.Engine, error) {
 	if config.IsDebug() {
 		gin.SetMode(gin.DebugMode)

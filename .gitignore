@@ -9,3 +9,5 @@ x-ui-*.tar.gz
 .sync*
 main
 *.db
+env.yml
+env.yaml

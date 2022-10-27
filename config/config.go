@@ -28,23 +28,22 @@ const (
 	Error LogLevel = "error"
 )
 
-var cfg = Config{}
+var cfg = &Config{}
 
 func init() {
-	cfg = Config{}
 	pwd, err := os.Getwd()
 	if err != nil {
 		panic(err)
 	}
+	err = config.ParseByte(basicConfig, cfg)
+	if err != nil {
+		panic(err)
+	}
+	err = config.ReadLocalConfigs(cfg)
+	if err != nil {
+		panic(err)
+	}
 	cfg.PWD = pwd
-	err = config.ParseByte(basicConfig, &cfg)
-	if err != nil {
-		panic(err)
-	}
-	err = config.ReadLocalConfigs(&cfg)
-	if err != nil {
-		panic(err)
-	}
 }
 
 func GetVersion() string {
@@ -74,6 +73,6 @@ func GetDBPath() string {
 	return cfg.DBPath
 }
 
-func GetCFG() Config {
+func GetCFG() *Config {
 	return cfg
 }
