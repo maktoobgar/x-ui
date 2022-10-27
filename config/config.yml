@@ -6,4 +6,4 @@ db_path: "x-ui.db"
 # info
 # warn
 # error
-log_level: "error"
+log_level: "info"

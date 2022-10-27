@@ -2,6 +2,7 @@ package config
 
 import (
 	_ "embed"
+	"os"
 	"strings"
 	"x-ui/pkg/config"
 )
@@ -17,6 +18,7 @@ type Config struct {
 	Version  string `yaml:"version"`
 	DBPath   string `yaml:"db_path"`
 	LogLever string `yaml:"log_level"`
+	PWD      string `yaml:"pwd"`
 }
 
 const (
@@ -30,7 +32,12 @@ var cfg = Config{}
 
 func init() {
 	cfg = Config{}
-	err := config.ParseByte(basicConfig, &cfg)
+	pwd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	cfg.PWD = pwd
+	err = config.ParseByte(basicConfig, &cfg)
 	if err != nil {
 		panic(err)
 	}
@@ -65,4 +72,8 @@ func IsDebug() bool {
 
 func GetDBPath() string {
 	return cfg.DBPath
+}
+
+func GetCFG() Config {
+	return cfg
 }
