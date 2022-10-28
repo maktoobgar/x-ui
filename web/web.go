@@ -220,8 +220,14 @@ func (s *Server) initI18n(engine *gin.Engine) error {
 		return err
 	}
 
+	//! Important, need to make it so that it actually does translations
+	engine.FuncMap["i18n"] = func(text string) string { return text }
+
 	engine.Use(func(c *gin.Context) {
 		lang := c.GetHeader("Accept-Language")
+		if len(lang) >= 2 {
+			lang = lang[0:2]
+		}
 		c.Set("translator", t.GetTranslator(lang))
 		c.Next()
 	})
