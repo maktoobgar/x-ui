@@ -11,8 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type InboundService struct {
-}
+type InboundService struct{}
 
 func (s *InboundService) GetInbounds(userId int) ([]*model.Inbound, error) {
 	db := database.GetDB()
@@ -186,14 +185,14 @@ func (s *InboundService) GetInboundClientIps(clientEmail string) (string, error)
 	}
 	return InboundClientIps.Ips, nil
 }
-func (s *InboundService) ClearClientIps(clientEmail string) (error) {
+
+func (s *InboundService) ClearClientIps(clientEmail string) error {
 	db := database.GetDB()
 
 	result := db.Model(model.InboundClientIps{}).
 		Where("client_email = ?", clientEmail).
 		Update("ips", "")
 	err := result.Error
-
 
 	if err != nil {
 		return err

@@ -2,13 +2,14 @@ package controller
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"strconv"
 	"x-ui/database/model"
 	"x-ui/logger"
 	"x-ui/web/global"
 	"x-ui/web/service"
 	"x-ui/web/session"
+
+	"github.com/gin-gonic/gin"
 )
 
 type InboundController struct {
@@ -33,8 +34,6 @@ func (a *InboundController) initRouter(g *gin.RouterGroup) {
 
 	g.POST("/clientIps/:email", a.getClientIps)
 	g.POST("/clearClientIps/:email", a.clearClientIps)
-	
-
 }
 
 func (a *InboundController) startTask() {
@@ -111,16 +110,18 @@ func (a *InboundController) updateInbound(c *gin.Context) {
 		a.xrayService.SetToNeedRestart()
 	}
 }
+
 func (a *InboundController) getClientIps(c *gin.Context) {
 	email := c.Param("email")
 
-	ips , err := a.inboundService.GetInboundClientIps(email)
+	ips, err := a.inboundService.GetInboundClientIps(email)
 	if err != nil {
 		jsonObj(c, "No IP Record", nil)
 		return
 	}
 	jsonObj(c, ips, nil)
 }
+
 func (a *InboundController) clearClientIps(c *gin.Context) {
 	email := c.Param("email")
 
