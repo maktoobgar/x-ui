@@ -32,6 +32,7 @@ type Inbound struct {
 	Remark     string `json:"remark" form:"remark"`
 	Enable     bool   `json:"enable" form:"enable"`
 	ExpiryTime int64  `json:"expiryTime" form:"expiryTime"`
+	Penalty    int8   `json:"penalty" form:"penalty" gorm:"default:-1"`
 
 	// config part
 	Listen         string   `json:"listen" form:"listen"`
@@ -43,9 +44,9 @@ type Inbound struct {
 	Sniffing       string   `json:"sniffing" form:"sniffing"`
 }
 type InboundClientIps struct {
-	Id       int    `json:"id" gorm:"primaryKey;autoIncrement"`
+	Id          int    `json:"id" gorm:"primaryKey;autoIncrement"`
 	ClientEmail string `json:"clientEmail" form:"clientEmail" gorm:"unique"`
-	Ips string `json:"ips" form:"ips"`
+	Ips         string `json:"ips" form:"ips"`
 }
 
 func (i *Inbound) GenXrayInboundConfig() *xray.InboundConfig {

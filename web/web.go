@@ -296,8 +296,9 @@ func (s *Server) startTask() {
 	// 每 30 秒检查一次 inbound 流量超出和到期的情况
 	s.cron.AddJob("@every 30s", job.NewCheckInboundJob())
 
-	// check client ips from log file every 1 min
-	s.cron.AddJob("@every 1m", job.NewCheckClientIpJob())
+	penalty, _ := s.settingService.GetPenalty()
+	// check client ips from log file every 30 seconds (changing `30s` affects penalty system, please don't)
+	s.cron.AddJob("@every 30s", job.NewCheckClientIpJob(penalty))
 
 	// 每一天提示一次流量情况,上海时间8点30
 	var entry cron.EntryID
@@ -309,7 +310,7 @@ func (s *Server) startTask() {
 			runtime = "@daily"
 		}
 		logger.Infof("Tg notify enabled,run at %s", runtime)
-		entry, err = s.cron.AddJob(runtime, job.NewStatsNotifyJob())
+		_, err = s.cron.AddJob(runtime, job.NewStatsNotifyJob())
 		if err != nil {
 			logger.Warning("Add NewStatsNotifyJob error", err)
 			return

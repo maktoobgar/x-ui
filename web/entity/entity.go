@@ -39,6 +39,7 @@ type AllSetting struct {
 	XrayTemplateConfig string `json:"xrayTemplateConfig" form:"xrayTemplateConfig"`
 
 	TimeLocation string `json:"timeLocation" form:"timeLocation"`
+	Penalty      int    `json:"penalty" form:"penalty"`
 }
 
 func (s *AllSetting) CheckValid() error {

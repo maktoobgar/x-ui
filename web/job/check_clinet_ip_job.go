@@ -17,17 +17,20 @@ import (
 type CheckClientIpJob struct {
 	xrayService    service.XrayService
 	inboundService service.InboundService
+	penalty        int8
 }
 
 var job *CheckClientIpJob
 
-func NewCheckClientIpJob() *CheckClientIpJob {
+func NewCheckClientIpJob(penalty int) *CheckClientIpJob {
 	job = new(CheckClientIpJob)
+	job.penalty = int8(penalty) * 2
 	return job
 }
 
 func (j *CheckClientIpJob) Run() {
 	logger.Debug("Check Client IP Job...")
+	activateInboundsAfterPenalty(j.penalty)
 	processLogFile()
 }
 
@@ -92,6 +95,47 @@ func processLogFile() {
 
 	err = AddInboundsClientIps(inboundsClientIps)
 	checkError(err)
+}
+
+func activateInboundsAfterPenalty(penalty int8) {
+	inbounds := GetInactivePenaltyInbounds()
+	for i := 0; i < len(inbounds); i++ {
+		element := inbounds[i]
+		if element.Penalty < penalty {
+			updateInboudPenaltyBy1(element.Id, element.Penalty)
+		} else {
+			activateInboundAfterFullPenalty(element.Id)
+		}
+	}
+}
+
+func updateInboudPenaltyBy1(id int, currentPenalty int8) {
+	db := database.GetDB()
+	err := db.Model(model.Inbound{}).
+		Where("id = ? and enable = ?", id, false).
+		Update("penalty", currentPenalty+1).Error
+	if err != nil {
+		logger.Error("couldn't update inactive penalty inbound count by 1: ", err)
+	}
+}
+
+func activateInboundAfterFullPenalty(id int) {
+	db := database.GetDB()
+	var inbound *model.Inbound
+	err := db.Model(model.Inbound{}).
+		Where("id = ? and enable = ?", id, false).Find(&inbound).Error
+	if err != nil {
+		logger.Error("couldn't find inbound with id: ", id)
+		return
+	} else {
+		job.xrayService.SetToNeedRestart()
+	}
+
+	inbound.Enable = true
+	inbound.Penalty = -1
+	db.Save(&inbound)
+
+	logger.Warning("enable inbound with id:", id)
 }
 
 func GetAccessLogPath() string {
@@ -192,10 +236,16 @@ func GetInboundByEmail(clientEmail string) (*model.Inbound, error) {
 
 func DisableInbound(id int) error {
 	db := database.GetDB()
-	result := db.Model(model.Inbound{}).
-		Where("id = ? and enable = ?", id, true).
-		Update("enable", false)
-	err := result.Error
+	var inbound *model.Inbound
+	err := db.Model(model.Inbound{}).
+		Where("id = ? and enable = ?", id, true).Find(&inbound).Error
+	if err != nil {
+		logger.Error("couldn't find inbound with id: ", id)
+	}
+
+	inbound.Enable = false
+	inbound.Penalty = 0
+	db.Save(&inbound)
 	logger.Warning("disable inbound with id:", id)
 
 	if err == nil {
@@ -203,4 +253,17 @@ func DisableInbound(id int) error {
 	}
 
 	return err
+}
+
+func GetInactivePenaltyInbounds() []*model.Inbound {
+	db := database.GetDB()
+	inbounds := []*model.Inbound{}
+	err := db.Model(model.Inbound{}).
+		Where("enable = ? and penalty > ?", false, -1).
+		Find(&inbounds).Error
+	if err != nil {
+		logger.Error("couldn't find inactive penalty inbounds: ", err)
+	}
+
+	return inbounds
 }

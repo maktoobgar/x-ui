@@ -33,6 +33,7 @@ var defaultValueMap = map[string]string{
 	"tgBotToken":         "",
 	"tgBotChatId":        "0",
 	"tgRunTime":          "",
+	"penalty":            "0",
 }
 
 type SettingService struct {
@@ -251,6 +252,10 @@ func (s *SettingService) GetSecret() ([]byte, error) {
 		}
 	}
 	return []byte(secret), err
+}
+
+func (s *SettingService) GetPenalty() (int, error) {
+	return s.getInt("penalty")
 }
 
 func (s *SettingService) GetBasePath() (string, error) {
