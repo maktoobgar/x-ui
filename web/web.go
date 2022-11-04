@@ -297,7 +297,7 @@ func (s *Server) startTask() {
 	s.cron.AddJob("@every 30s", job.NewCheckInboundJob())
 
 	penalty, _ := s.settingService.GetPenalty()
-	// check client ips from log file every 30 seconds (changing `30s` affects penalty system, please don't)
+	// check client ips from log file every 30 seconds (changing `30s` affects penalty system)
 	s.cron.AddJob("@every 30s", job.NewCheckClientIpJob(penalty))
 
 	// 每一天提示一次流量情况,上海时间8点30

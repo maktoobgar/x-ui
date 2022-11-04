@@ -135,7 +135,7 @@ func activateInboundAfterFullPenalty(id int) {
 	inbound.Penalty = -1
 	db.Save(&inbound)
 
-	logger.Warning("enable inbound with id:", id)
+	logger.Warning("enable inbound after finished penalty with id: ", id)
 }
 
 func GetAccessLogPath() string {
