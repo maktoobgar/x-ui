@@ -82,7 +82,7 @@
                         <a-tab-pane key="5" tab="其他设置">
                             <a-list item-layout="horizontal" style="background: white">
                                 <setting-list-item type="text" title="时区" desc="定时任务按照该时区的时间运行，重启面板生效" v-model="allSetting.timeLocation"></setting-list-item>
-                                <setting-list-item type="number" title="惩罚" desc="如果入站连接的连接计数超过分配给它的限制，则该入站将在此处定义的分钟内关闭" v-model.number="allSetting.penalty"></setting-list-item>
+                                <setting-list-item type="number" title="惩罚" desc="如果入站连接的连接计数超过分配给它的限制，则该入站将在此处定义的分钟内关闭（如果为 0，则罚款 30 秒）" v-model.number="allSetting.penalty"></setting-list-item>
                             </a-list>
                         </a-tab-pane>
                     </a-tabs>

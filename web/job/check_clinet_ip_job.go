@@ -17,14 +17,14 @@ import (
 type CheckClientIpJob struct {
 	xrayService    service.XrayService
 	inboundService service.InboundService
-	penalty        int8
+	penalty        int
 }
 
 var job *CheckClientIpJob
 
 func NewCheckClientIpJob(penalty int) *CheckClientIpJob {
 	job = new(CheckClientIpJob)
-	job.penalty = int8(penalty) * 2
+	job.penalty = penalty * 2
 	return job
 }
 
@@ -97,7 +97,7 @@ func processLogFile() {
 	checkError(err)
 }
 
-func activateInboundsAfterPenalty(penalty int8) {
+func activateInboundsAfterPenalty(penalty int) {
 	inbounds := GetInactivePenaltyInbounds()
 	for i := 0; i < len(inbounds); i++ {
 		element := inbounds[i]
@@ -109,7 +109,7 @@ func activateInboundsAfterPenalty(penalty int8) {
 	}
 }
 
-func updateInboudPenaltyBy1(id int, currentPenalty int8) {
+func updateInboudPenaltyBy1(id int, currentPenalty int) {
 	db := database.GetDB()
 	err := db.Model(model.Inbound{}).
 		Where("id = ? and enable = ?", id, false).

@@ -32,7 +32,7 @@ type Inbound struct {
 	Remark     string `json:"remark" form:"remark"`
 	Enable     bool   `json:"enable" form:"enable"`
 	ExpiryTime int64  `json:"expiryTime" form:"expiryTime"`
-	Penalty    int8   `json:"penalty" form:"penalty" gorm:"default:-1"`
+	Penalty    int    `json:"penalty" form:"penalty" gorm:"default:-1"`
 
 	// config part
 	Listen         string   `json:"listen" form:"listen"`
