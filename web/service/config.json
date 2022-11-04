@@ -60,5 +60,8 @@
       }
     ]
   },
-  "stats": {}
+  "stats": {},
+  "log": {
+    "access": "./access.log"
+  }
 }
