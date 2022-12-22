@@ -30,11 +30,11 @@ func NewCheckClientIpJob(penalty int) *CheckClientIpJob {
 
 func (j *CheckClientIpJob) Run() {
 	logger.Debug("Check Client IP Job...")
-	activateInboundsAfterPenalty(j.penalty)
-	processLogFile()
+	emails := activateInboundsAfterPenalty(j.penalty)
+	processLogFile(emails)
 }
 
-func processLogFile() {
+func processLogFile(emails map[string]bool) {
 	accessLogPath := GetAccessLogPath()
 	if accessLogPath == "" {
 		logger.Warning("xray log not init in config.json")
@@ -66,19 +66,18 @@ func processLogFile() {
 			if matchesEmail == "" {
 				continue
 			}
-			matchesEmail = ss.Split(matchesEmail, "email: ")[1]
-
-			if InboundClientIps[matchesEmail] != nil {
-				if contains(InboundClientIps[matchesEmail], ip) {
-					continue
+			matchesEmail = ss.TrimSpace(ss.Split(matchesEmail, "email: ")[1])
+			if _, ok := emails[matchesEmail]; !ok {
+				if InboundClientIps[matchesEmail] != nil {
+					if contains(InboundClientIps[matchesEmail], ip) {
+						continue
+					}
+					InboundClientIps[matchesEmail] = append(InboundClientIps[matchesEmail], ip)
+				} else {
+					InboundClientIps[matchesEmail] = append(InboundClientIps[matchesEmail], ip)
 				}
-				InboundClientIps[matchesEmail] = append(InboundClientIps[matchesEmail], ip)
-
-			} else {
-				InboundClientIps[matchesEmail] = append(InboundClientIps[matchesEmail], ip)
 			}
 		}
-
 	}
 	err = ClearInboudClientIps()
 	if err != nil {
@@ -97,16 +96,43 @@ func processLogFile() {
 	checkError(err)
 }
 
-func activateInboundsAfterPenalty(penalty int) {
+type getEmail struct {
+	Email string `json:"email"`
+}
+
+type justToGetEmail struct {
+	Clients []getEmail `json:"clients"`
+}
+
+// Returns emails of inactive accounts
+func activateInboundsAfterPenalty(penalty int) map[string]bool {
 	inbounds := GetInactivePenaltyInbounds()
+	activated := map[int]bool{}
 	for i := 0; i < len(inbounds); i++ {
 		element := inbounds[i]
 		if element.Penalty < penalty {
 			updateInboudPenaltyBy1(element.Id, element.Penalty)
 		} else {
+			activated[i] = true
 			activateInboundAfterFullPenalty(element.Id)
 		}
 	}
+
+	output := map[string]bool{}
+	for i := 0; i < len(inbounds); i++ {
+		if ok := activated[i]; !ok {
+			toGetEmail := &justToGetEmail{}
+			json.Unmarshal([]byte(inbounds[i].Settings), toGetEmail)
+			if len(toGetEmail.Clients) != 0 {
+				email := toGetEmail.Clients[0].Email
+				output[email] = true
+			} else {
+				continue
+			}
+		}
+	}
+
+	return output
 }
 
 func updateInboudPenaltyBy1(id int, currentPenalty int) {
