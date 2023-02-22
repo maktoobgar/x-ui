@@ -222,7 +222,12 @@ func GetInboundClientIps(clientEmail string, ips []string) *model.InboundClientI
 	}
 	limitIpRegx, _ := regexp.Compile(`"limitIp": .+`)
 	limitIpMactch := limitIpRegx.FindString(inbound.Settings)
-	limitIpMactch = ss.Split(limitIpMactch, `"limitIp": `)[1]
+	limitIpMactchs := ss.Split(limitIpMactch, `"limitIp": `)
+	if len(limitIpMactchs) > 1 {
+		limitIpMactch = limitIpMactchs[1]
+	} else {
+		limitIpMactch = "0"
+	}
 	limitIp, err := strconv.Atoi(limitIpMactch)
 	if err != nil {
 		return nil
